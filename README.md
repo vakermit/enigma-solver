@@ -57,7 +57,7 @@ The GPU solver requires macOS with Metal support. It compiles the compute shader
 
 ## Limitations
 
-- Short messages (<50 chars) have unreliable IoC — the solver warns when this happens
+- Short messages degrade IoC accuracy: <50 chars is unreliable, 50-100 marginal, 150+ reliable. Historical messages averaged 200-250 chars. The solver warns at each threshold. See [docs/message_formatting.md](docs/message_formatting.md) for the statistical derivation.
 - Heavy plugboard usage (10 pairs) on short messages produces ambiguous results — historically, the Allies needed cribs (known plaintext) for these cases
 - Python supports Army (I-V), Navy M3 (I-VIII), and M4 (Beta/Gamma + I-VIII + thin reflectors); C++ currently supports Army only
 
@@ -93,6 +93,7 @@ docs/
   cryptanalysis_math.md # IoC, bigrams, Banburismus, the Bombe, hill climbing, keyspace
   bletchley_park.md     # the place, the Poles, Turing, Welchman, Knox, the women, Colossus
   german_procedures.md  # networks, key sheets, message formats, Navy Kenngruppen, variants
+  message_formatting.md # 250-char limit, IoC vs length thresholds, punctuation/number encoding
 ```
 
 ## Background Reading
@@ -101,3 +102,4 @@ docs/
 - [The Mathematics of Breaking Enigma](docs/cryptanalysis_math.md) — Friedman's Index of Coincidence, bigram frequency analysis, Turing's Banburismus and the Bombe, hill climbing for plugboard recovery, and the combinatorics of the 159-quintillion-configuration keyspace.
 - [Bletchley Park: The Place and Its People](docs/bletchley_park.md) — Station X, the Polish mathematicians who broke Enigma five years before the British, Turing, Welchman, Knox, the 7,500 women who made up 75% of the workforce, Tommy Flowers and Colossus, and the three decades of silence that followed.
 - [German Enigma Procedures and Variations](docs/german_procedures.md) — The named radio networks (Red, Dolphin, Shark), daily key sheets, Army vs. Navy indicator systems, the Kenngruppen system, Short Weather Cipher and Short Signal Book, machine variants from the Enigma I through the M4, and the procedural failures that gave the codebreakers their openings.
+- [Message Length and Formatting](docs/message_formatting.md) — The 250-character limit and why it existed, the statistical thresholds where IoC becomes reliable (with the math), punctuation and number substitutions (FRAGE, ZWO, KLAM), and why the historical message length sits at the boundary where ciphertext-only attacks become effective.

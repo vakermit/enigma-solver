@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <numeric>
 #include <chrono>
+#include <set>
 #include <getopt.h>
 
 static const char* METAL_SHADER = R"(
@@ -157,16 +158,18 @@ void display_results(const std::vector<Candidate>& results, int show_n) {
 }
 
 int main(int argc, char** argv) {
-    // Parse args
     char ciphertext[4096] = {};
     int ct_len = 0;
     int ct_nums[4096];
     int beam = 50, show_n = 10;
     bool use_german = true, do_plugboard = false;
+    (void)do_plugboard;
+    bool quick_pass = false;
+    int quick_pass_pct = 25;
     char output_file[256] = {};
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:l:b:r:po:n:h")) != -1) {
+    while ((opt = getopt(argc, argv, "f:l:b:r:po:n:qQ:h")) != -1) {
         switch (opt) {
         case 'f': {
             FILE* fp = fopen(optarg, "r");
@@ -180,8 +183,12 @@ int main(int argc, char** argv) {
         case 'p': do_plugboard = true; break;
         case 'o': strncpy(output_file, optarg, sizeof(output_file) - 1); break;
         case 'n': show_n = atoi(optarg); break;
+        case 'q': quick_pass = true; break;
+        case 'Q': quick_pass_pct = atoi(optarg); break;
         case 'h':
-            printf("Usage: solver_gpu [options] <ciphertext>\n");
+            printf("Usage: solver_gpu [options] <ciphertext>\n"
+                   "  -q        Quick pass: prune combos by peak IoC before ring refinement\n"
+                   "  -Q N      Quick pass: keep top N%% (default: 25)\n");
             return 0;
         }
     }
@@ -331,24 +338,74 @@ int main(int argc, char** argv) {
                enigma::ROTOR_NAMES[enigma::COMBOS[best_combo].r[2]],
                'A' + best_pos / 676, 'A' + (best_pos / 26) % 26, 'A' + best_pos % 26);
 
-        // Build candidates
+        // Build candidates (with optional quick-pass combo filtering)
         const float (*bigrams)[26] = use_german ? enigma::DE_BIGRAMS : enigma::EN_BIGRAMS;
-        std::vector<Candidate> candidates(beam);
-        for (int i = 0; i < beam; i++) {
-            int idx = indices[i];
-            int combo = idx / 17576;
-            int posidx = idx % 17576;
-            candidates[i].ioc = ioc_results[idx];
-            candidates[i].combo_idx = combo;
-            candidates[i].lp = posidx / 676;
-            candidates[i].mp = (posidx / 26) % 26;
-            candidates[i].rp = posidx % 26;
-            candidates[i].lr = candidates[i].mr = candidates[i].rr = 0;
-            candidates[i].plugboard[0] = 0;
-            candidates[i].pt_len = ct_len;
+        std::vector<Candidate> candidates;
+
+        if (quick_pass) {
+            int keep_n = std::max(1, enigma::NUM_COMBOS * quick_pass_pct / 100);
+            printf("\n--- Quick pass: ranking %d combos by peak IoC, keeping top %d%% (%d) ---\n",
+                   enigma::NUM_COMBOS, quick_pass_pct, keep_n);
+
+            struct CS { float peak; int idx; };
+            std::vector<CS> cscores(enigma::NUM_COMBOS);
+            for (int ci = 0; ci < enigma::NUM_COMBOS; ci++) {
+                float peak = 0;
+                int base = ci * 17576;
+                for (int p = 0; p < 17576; p++)
+                    if (ioc_results[base + p] > peak) peak = ioc_results[base + p];
+                cscores[ci] = {peak, ci};
+            }
+            std::partial_sort(cscores.begin(), cscores.begin() + keep_n, cscores.end(),
+                              [](const CS& a, const CS& b) { return a.peak > b.peak; });
+            printf("  Best: %s %s %s (peak %.6f)\n",
+                   enigma::ROTOR_NAMES[enigma::COMBOS[cscores[0].idx].r[0]],
+                   enigma::ROTOR_NAMES[enigma::COMBOS[cscores[0].idx].r[1]],
+                   enigma::ROTOR_NAMES[enigma::COMBOS[cscores[0].idx].r[2]], cscores[0].peak);
+
+            std::set<int> surviving;
+            for (int i = 0; i < keep_n; i++) surviving.insert(cscores[i].idx);
+
+            int found = 0;
+            for (int i = 0; i < total && found < beam; i++) {
+                int ci = indices[i] / 17576;
+                if (surviving.count(ci)) {
+                    int posidx = indices[i] % 17576;
+                    Candidate c = {};
+                    c.ioc = ioc_results[indices[i]];
+                    c.combo_idx = ci;
+                    c.lp = posidx / 676;
+                    c.mp = (posidx / 26) % 26;
+                    c.rp = posidx % 26;
+                    c.pt_len = ct_len;
+                    candidates.push_back(c);
+                    found++;
+                }
+            }
+        } else {
+            candidates.resize(beam);
+            for (int i = 0; i < beam; i++) {
+                int idx = indices[i];
+                int combo = idx / 17576;
+                int posidx = idx % 17576;
+                candidates[i].ioc = ioc_results[idx];
+                candidates[i].combo_idx = combo;
+                candidates[i].lp = posidx / 676;
+                candidates[i].mp = (posidx / 26) % 26;
+                candidates[i].rp = posidx % 26;
+                candidates[i].lr = candidates[i].mr = candidates[i].rr = 0;
+                candidates[i].plugboard[0] = 0;
+                candidates[i].pt_len = ct_len;
+            }
         }
 
-        // Phase 2-4: Ring refinement (CPU)
+        printf("  Best IoC: %.6f  (%s %s %s @ %c%c%c)\n", candidates[0].ioc,
+               enigma::ROTOR_NAMES[enigma::COMBOS[candidates[0].combo_idx].r[0]],
+               enigma::ROTOR_NAMES[enigma::COMBOS[candidates[0].combo_idx].r[1]],
+               enigma::ROTOR_NAMES[enigma::COMBOS[candidates[0].combo_idx].r[2]],
+               'A' + candidates[0].lp, 'A' + candidates[0].mp, 'A' + candidates[0].rp);
+
+        // Ring refinement (CPU)
         const int* reflector = enigma::REFLECTOR_B;
         for (int ring_idx = 0; ring_idx < 3; ring_idx++) {
             const char* names[] = {"left", "middle", "right"};

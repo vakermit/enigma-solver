@@ -52,6 +52,72 @@ GERMAN_BIGRAMS = {
 }
 
 
+FMT_ALIASES = {
+    'army': 'army', 'luftwaffe': 'army', 'airforce': 'army',
+    'navy': 'navy', 'kriegsmarine': 'navy',
+    'raw': 'raw',
+}
+
+NUM_TO_WORD = {
+    '0': 'NULL', '1': 'EINS', '2': 'ZWO', '3': 'DREI', '4': 'VIER',
+    '5': 'FUENF', '6': 'SECHS', '7': 'SIEBEN', '8': 'ACHT', '9': 'NEUN',
+}
+
+WORD_TO_NUM = {v: k for k, v in NUM_TO_WORD.items()}
+
+
+def encode_enigma(text, fmt='army'):
+    """Convert human-readable text to Enigma-formatted uppercase alpha."""
+    if fmt == 'raw':
+        return ''.join(c for c in text.upper() if c.isalpha())
+    text = text.upper()
+    for digit, word in NUM_TO_WORD.items():
+        text = text.replace(digit, word)
+    if fmt == 'navy':
+        text = text.replace('?', 'UD')
+        text = text.replace(',', 'Y')
+    else:
+        text = text.replace('?', 'FRAGE')
+        text = text.replace(',', 'ZZ')
+        text = text.replace('CH', 'Q')
+    text = text.replace(':', 'XX')
+    text = text.replace('(', 'KLAM')
+    text = text.replace(')', 'KLAM')
+    text = text.replace('.', 'X')
+    text = text.replace(' ', '')
+    return ''.join(c for c in text if c.isalpha())
+
+
+def decode_enigma(text, fmt='army'):
+    """Reverse Enigma formatting to human-readable text.
+
+    Only decodes unambiguous substitutions. Q→CH and Y→comma are NOT
+    reversed because Q and Y are common letters and decoding them
+    would corrupt legitimate uses.
+    """
+    if fmt == 'raw':
+        return text
+    # Multi-char substitutions first (longest match wins)
+    for word, digit in sorted(WORD_TO_NUM.items(), key=lambda x: -len(x[0])):
+        text = text.replace(word, digit)
+    if fmt == 'navy':
+        text = text.replace('UD', '?')
+    else:
+        text = text.replace('FRAGE', '?')
+        text = text.replace('FRAQ', '?')
+    text = text.replace('KLAM', '()')
+    if fmt != 'navy':
+        text = text.replace('ZZ', ', ')
+    text = text.replace('XX', ': ')
+    text = text.replace('X', ' ')
+    return text
+
+
+def group_text(text, size=5):
+    """Format text into N-letter groups."""
+    return ' '.join(text[i:i + size] for i in range(0, len(text), size))
+
+
 @dataclass
 class Candidate:
     rotors: str
@@ -470,26 +536,64 @@ def main():
                         help='Percentage of rotor combos to keep in quick pass (default: 25)')
     parser.add_argument('--test-separate-rings', action='store_true',
                         help='Test rotor positions one at a time (left→mid→right beam search)')
+    parser.add_argument('--fmt', choices=list(FMT_ALIASES.keys()), default=None,
+                        help='Punctuation standard: army (default), luftwaffe, airforce, '
+                             'navy, kriegsmarine, raw. --navy auto-selects navy.')
+    parser.add_argument('--pretty-input', action=argparse.BooleanOptionalAction, default=True,
+                        help='Display ciphertext in letter groups (default: on)')
+    parser.add_argument('--pretty-output', action=argparse.BooleanOptionalAction, default=True,
+                        help='Decode plaintext substitutions (FRAGE→?, X→space, etc.) (default: on)')
+    parser.add_argument('--raw', action='store_true',
+                        help='Shorthand for --fmt raw --no-pretty-input --no-pretty-output')
     args = parser.parse_args()
+
+    # Resolve formatting standard
+    if args.raw:
+        punct_fmt = 'raw'
+        args.pretty_input = False
+        args.pretty_output = False
+    elif args.fmt:
+        punct_fmt = FMT_ALIASES[args.fmt]
+    elif args.navy or args.m4:
+        punct_fmt = 'navy'
+    else:
+        punct_fmt = 'army'
+
+    group_size = 4 if punct_fmt == 'navy' else 5
 
     if args.file:
         with open(args.file) as f:
-            ct = f.read().strip()
+            ct_raw = f.read().strip()
     elif args.ciphertext:
-        ct = args.ciphertext
+        ct_raw = args.ciphertext
     else:
         parser.error('Provide ciphertext as argument or via -f/--file')
 
-    ct = ''.join(c for c in ct.upper() if c.isalpha())
+    has_nonalpha = any(not c.isalpha() and not c.isspace() for c in ct_raw)
+    ct = encode_enigma(ct_raw, punct_fmt) if has_nonalpha else ''.join(
+        c for c in ct_raw.upper() if c.isalpha()
+    )
+    if has_nonalpha and punct_fmt != 'raw':
+        print(f'Input converted ({punct_fmt} standard): {ct[:60]}{"..." if len(ct) > 60 else ""}')
 
-    if len(ct) < 20:
-        print(f'WARNING: ciphertext is only {len(ct)} chars — IoC will be unreliable', file=sys.stderr)
+    if len(ct) < 50:
+        print(f'WARNING: {len(ct)} chars is very short — IoC confidence intervals overlap '
+              f'heavily with random. Results unreliable. Historical messages were 200-250 chars.',
+              file=sys.stderr)
+    elif len(ct) < 100:
+        print(f'NOTE: {len(ct)} chars is short. IoC separation from random is marginal. '
+              f'Results may miss correct settings.', file=sys.stderr)
+    elif len(ct) < 150:
+        print(f'NOTE: {len(ct)} chars — workable but below the 200-250 char historical norm.',
+              file=sys.stderr)
 
     rotors = ROTORS_NAVY if (args.navy or args.m4) else ROTORS_ARMY
     mode = 'M4' if args.m4 else ('Navy M3' if args.navy else 'Army/Luftwaffe')
 
-    print(f'Ciphertext ({len(ct)} chars): {ct[:60]}{"..." if len(ct) > 60 else ""}')
-    print(f'Language: {args.lang} | Beam: {args.beam} | Reflector: {args.reflector} | Mode: {mode}')
+    ct_display = group_text(ct, group_size) if args.pretty_input else ct
+    print(f'Ciphertext ({len(ct)} chars): {ct_display[:72]}{"..." if len(ct_display) > 72 else ""}')
+    fmt_label = f'{punct_fmt}' + (' (pretty)' if args.pretty_output else '')
+    print(f'Language: {args.lang} | Beam: {args.beam} | Reflector: {args.reflector} | Mode: {mode} | Fmt: {fmt_label}')
     print(f'Target IoC: {IOC_TARGET[args.lang]:.4f} (random: {IOC_TARGET["random"]:.4f})')
     n_combos = len(list(itertools.permutations(rotors, 3)))
     print(f'Rotors: {" ".join(rotors)} ({n_combos} permutations)')
@@ -534,14 +638,25 @@ def main():
 
     for i, c in enumerate(all_results[:show_n]):
         ring_str = f'{c.rings[0]:>2},{c.rings[1]:>2},{c.rings[2]:>2}'
-        preview = c.plaintext[:35]
+        raw_preview = c.plaintext[:35]
+        preview = decode_enigma(raw_preview, punct_fmt) if args.pretty_output else raw_preview
         plug = '*' if c.plugboard else ' '
         print(f'{i + 1:>3}{plug} {c.rotors:<12} {c.reflector:>3} {ring_str:<10} {c.start:<6} '
               f'{c.ioc:>7.5f} {c.bigram_score:>7.2f}  {preview}')
 
     if args.plugboard and all_results and all_results[0].plugboard:
         print(f'\nBest plugboard: {all_results[0].plugboard}')
-        print(f'Full plaintext: {all_results[0].plaintext}')
+        full_pt = all_results[0].plaintext
+        if args.pretty_output:
+            print(f'Full plaintext (raw):     {full_pt}')
+            print(f'Full plaintext (decoded): {decode_enigma(full_pt, punct_fmt)}')
+        else:
+            print(f'Full plaintext: {full_pt}')
+    elif all_results and args.pretty_output:
+        full_pt = all_results[0].plaintext
+        decoded = decode_enigma(full_pt, punct_fmt)
+        if decoded != full_pt:
+            print(f'\nBest plaintext (decoded): {decoded}')
 
     if args.output and all_results:
         save_settings(all_results[0], args.output)
