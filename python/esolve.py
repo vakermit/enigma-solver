@@ -139,34 +139,114 @@ def ring_phase(ct, candidates, ring_idx, label, beam_width, reflector):
     return top
 
 
-def solve(ct, beam_width, reflector, lang, rotors):
+def solve(ct, beam_width, reflector, lang, rotors,
+          quick_pass=False, quick_pass_pct=25, separate_rings=False):
     bigrams = GERMAN_BIGRAMS if lang == 'german' else ENGLISH_BIGRAMS
     rotor_combos = list(itertools.permutations(rotors, 3))
     total_trials = 0
 
-    # Phase 1: brute-force all rotor combos × all 26³ start positions
-    n_trials = len(rotor_combos) * 26 * 26 * 26
-    print(f'\n--- Phase 1: {len(rotor_combos)} rotor combos × 17,576 positions = {n_trials:,} trials ---')
-    candidates = []
-    for ci, combo in enumerate(rotor_combos):
-        rs = ' '.join(combo)
-        for l in ALPHABET:
-            for m in ALPHABET:
-                for r in ALPHABET:
-                    start = l + m + r
-                    pt = decrypt(ct, rs, reflector, [0, 0, 0], start)
-                    ioc = calc_ioc(pt)
-                    candidates.append((ioc, rs, start, [0, 0, 0]))
-        if (ci + 1) % 10 == 0:
-            print(f'  ... {ci + 1}/{len(rotor_combos)} rotor combos done')
-    total_trials += len(candidates)
-    candidates.sort(reverse=True)
-    refined = candidates[:beam_width]
-    print(f'  Best IoC: {refined[0][0]:.6f}  ({refined[0][1]} @ {refined[0][2]})')
+    # Quick pass: full 26^3 per combo, but score by top-100 average IoC
+    # to rank combos. Keep top N%, then only refine rings on those.
+    # Runs the same brute force but collects per-combo stats for pruning.
+    if quick_pass:
+        keep_n = max(1, int(len(rotor_combos) * quick_pass_pct / 100))
+        n_qp = len(rotor_combos) * 17576
+        print(f'\n--- Quick pass + search: {len(rotor_combos)} combos × 17,576 = {n_qp:,} trials ---')
+        print(f'  Will keep top {quick_pass_pct}% ({keep_n} combos) for ring refinement')
+        combo_data = []
+        for ci, combo in enumerate(rotor_combos):
+            rs = ' '.join(combo)
+            combo_results = []
+            for l in ALPHABET:
+                for m in ALPHABET:
+                    for r in ALPHABET:
+                        pt = decrypt(ct, rs, reflector, [0, 0, 0], l + m + r)
+                        ioc = calc_ioc(pt)
+                        combo_results.append((ioc, rs, l + m + r, [0, 0, 0]))
+            combo_results.sort(reverse=True)
+            peak_ioc = combo_results[0][0]
+            combo_data.append((peak_ioc, combo_results))
+            if (ci + 1) % 10 == 0:
+                print(f'  ... {ci + 1}/{len(rotor_combos)} combos done')
+        total_trials += n_qp
 
-    # Phase 4-6: ring setting refinement (left, middle, right)
+        combo_data.sort(reverse=True)
+        surviving = combo_data[:keep_n]
+        best_combo_rs = surviving[0][1][0][1]
+        worst_kept_rs = surviving[-1][1][0][1]
+        print(f'  Best combo: {best_combo_rs} (peak IoC: {combo_data[0][0]:.6f})')
+        print(f'  Cutoff: {worst_kept_rs} (peak IoC: {surviving[-1][0]:.6f})')
+        print(f'  Eliminated {len(rotor_combos) - keep_n} combos from ring refinement')
+
+        # Merge top candidates from surviving combos
+        all_cands = []
+        for _, results in surviving:
+            all_cands.extend(results[:beam_width])
+        all_cands.sort(reverse=True)
+        refined = all_cands[:beam_width]
+        print(f'  Best IoC: {refined[0][0]:.6f}  ({refined[0][1]} @ {refined[0][2]})')
+
+    elif separate_rings:
+        # Two-phase beam search: left×mid first, then expand right
+        intermediate_beam = beam_width * 5
+        n_trials = len(rotor_combos) * 676
+        print(f'\n--- Phase 1a: {len(rotor_combos)} combos × 676 left×mid = {n_trials:,} trials ---')
+        print(f'  Intermediate beam: {intermediate_beam}')
+        candidates = []
+        for ci, combo in enumerate(rotor_combos):
+            rs = ' '.join(combo)
+            for left in ALPHABET:
+                for mid in ALPHABET:
+                    pt = decrypt(ct, rs, reflector, [0, 0, 0], left + mid + 'A')
+                    ioc = calc_ioc(pt)
+                    candidates.append((ioc, rs, left + mid + 'A', [0, 0, 0]))
+            if (ci + 1) % 20 == 0:
+                print(f'  ... {ci + 1}/{len(rotor_combos)} combos done')
+        total_trials += len(candidates)
+        candidates.sort(reverse=True)
+        candidates = candidates[:intermediate_beam]
+        print(f'  Best IoC: {candidates[0][0]:.6f}  ({candidates[0][1]} @ {candidates[0][2]})')
+
+        print(f'\n--- Phase 1b: top {intermediate_beam} × 26 right positions ---')
+        expanded = []
+        seen = set()
+        for (_, rs, start, rings) in candidates:
+            for right in ALPHABET:
+                s = start[0] + start[1] + right
+                key = (rs, s, tuple(rings))
+                if key in seen:
+                    continue
+                seen.add(key)
+                pt = decrypt(ct, rs, reflector, rings, s)
+                expanded.append((calc_ioc(pt), rs, s, rings))
+        total_trials += len(expanded)
+        expanded.sort(reverse=True)
+        refined = expanded[:beam_width]
+        print(f'  Best IoC: {refined[0][0]:.6f}  ({refined[0][1]} @ {refined[0][2]})')
+
+    else:
+        # Full brute force: all combos × all 26^3 positions
+        n_trials = len(rotor_combos) * 17576
+        print(f'\n--- Phase 1: {len(rotor_combos)} combos × 17,576 positions = {n_trials:,} trials ---')
+        candidates = []
+        for ci, combo in enumerate(rotor_combos):
+            rs = ' '.join(combo)
+            for l in ALPHABET:
+                for m in ALPHABET:
+                    for r in ALPHABET:
+                        pt = decrypt(ct, rs, reflector, [0, 0, 0], l + m + r)
+                        ioc = calc_ioc(pt)
+                        candidates.append((ioc, rs, l + m + r, [0, 0, 0]))
+            if (ci + 1) % 10 == 0:
+                print(f'  ... {ci + 1}/{len(rotor_combos)} rotor combos done')
+        total_trials += len(candidates)
+        candidates.sort(reverse=True)
+        refined = candidates[:beam_width]
+        print(f'  Best IoC: {refined[0][0]:.6f}  ({refined[0][1]} @ {refined[0][2]})')
+
+    # Ring setting refinement (left, middle, right)
     for idx, name in enumerate(['left', 'middle', 'right']):
-        print(f'\n--- Phase {idx + 4}: top {beam_width} × 26 {name} ring settings ---')
+        print(f'\n--- Ring refinement: top {beam_width} × 26 {name} ring settings ---')
         new_candidates = []
         seen = set()
         for (_, rs, start, rings) in refined:
@@ -384,6 +464,12 @@ def main():
                         help='Navy M3 mode: rotors I-VIII (336 combos instead of 60)')
     parser.add_argument('--m4', action='store_true',
                         help='Navy M4 mode: 4 rotors (Beta/Gamma + I-VIII + thin reflectors)')
+    parser.add_argument('--quick-pass', action='store_true',
+                        help='Quick pre-filter: eliminate low-scoring rotor combos before full search')
+    parser.add_argument('--quick-pass-pct', type=int, default=25,
+                        help='Percentage of rotor combos to keep in quick pass (default: 25)')
+    parser.add_argument('--test-separate-rings', action='store_true',
+                        help='Test rotor positions one at a time (left→mid→right beam search)')
     args = parser.parse_args()
 
     if args.file:
@@ -423,7 +509,10 @@ def main():
         for ref in reflectors:
             if len(reflectors) > 1:
                 print(f'\n{"=" * 50}\n  Reflector {ref}\n{"=" * 50}')
-            results, trials = solve(ct, args.beam, ref, args.lang, rotors)
+            results, trials = solve(ct, args.beam, ref, args.lang, rotors,
+                                    quick_pass=args.quick_pass,
+                                    quick_pass_pct=args.quick_pass_pct,
+                                    separate_rings=args.test_separate_rings)
             all_results.extend(results)
             total_trials += trials
 
