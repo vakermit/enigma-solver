@@ -1,0 +1,99 @@
+# Enigma Solver
+
+Ciphertext-only Enigma machine solver using Index of Coincidence (IoC) scoring and bigram frequency analysis.
+
+Given only ciphertext, recovers rotor selection, rotor positions, ring settings, and (optionally) plugboard pairings through brute-force search with beam pruning and hill climbing.
+
+## Implementations
+
+### Python (`python/`)
+
+Reference implementation using [py-enigma](https://pypi.org/project/py-enigma/). Slower but easy to read and modify.
+
+```bash
+cd python
+./install.sh              # creates venv, installs py-enigma
+source .venv/bin/activate
+python esolve.py --help
+python esolve.py "CIPHERTEXT" --lang english --beam 50
+```
+
+Windows:
+```powershell
+cd python
+.\install.ps1
+.venv\Scripts\Activate.ps1
+python esolve.py "CIPHERTEXT" --lang english --beam 50
+```
+
+### C++ (`cpp/`)
+
+High-performance implementation with multi-threaded CPU and Metal GPU backends. ~700x faster than Python (CPU), ~1,760x faster (GPU).
+
+```bash
+cd cpp
+make                    # CPU solver (multi-threaded)
+make gpu                # Metal GPU solver (macOS only)
+./solver --help
+./solver "CIPHERTEXT" -l english -b 50
+./solver_gpu "CIPHERTEXT" -l english -b 50
+```
+
+The GPU solver requires macOS with Metal support. It compiles the compute shader at runtime — no Xcode installation needed, just the Command Line Tools.
+
+## How It Works
+
+1. **Brute force** all 60 rotor permutations x 17,576 start positions (1,054,560 configurations), scoring each decryption by IoC
+2. **Ring refinement** — top N candidates tested across 26 settings per ring position (left, middle, right)
+3. **Plugboard hill climbing** (optional, `-p` flag) — iteratively adds letter-pair swaps that improve bigram score
+4. **Results ranked** by bigram frequency match against English or German
+
+### Fitness Metrics
+
+- **Index of Coincidence (IoC)**: measures how far a text's letter distribution is from random. English ~0.067, German ~0.076, random ~0.038. Used for rotor/position search.
+- **Bigram frequency**: scores consecutive letter pairs against language-specific frequency tables. More discriminating than IoC — used for final ranking and plugboard recovery.
+
+## Limitations
+
+- Short messages (<50 chars) have unreliable IoC — the solver warns when this happens
+- Heavy plugboard usage (10 pairs) on short messages produces ambiguous results — historically, the Allies needed cribs (known plaintext) for these cases
+- Only Wehrmacht rotors I-V and reflectors B/C are supported (not Kriegsmarine M4)
+
+## Performance
+
+Tested on Apple M1 Max, 88-character ciphertext:
+
+| Implementation | Phase 1 Time | Speedup |
+|----------------|-------------|---------|
+| Python | 153 s | 1x |
+| C++ CPU (10 threads) | 218 ms | 700x |
+| C++ Metal GPU (32 cores) | 87 ms | 1,760x |
+
+## Files
+
+```
+python/
+  esolve.py          # main solver
+  enigma_test.py     # encrypt/decrypt demo
+  efind.py           # early experiment
+  requirements.txt
+  install.sh         # setup for macOS/Linux
+  install.ps1        # setup for Windows
+
+cpp/
+  enigma.h           # header-only Enigma machine
+  solver.cpp         # multi-threaded CPU solver
+  metal_solver.mm    # Metal GPU solver (macOS)
+  Makefile
+
+docs/
+  enigma_history.md   # the machine: origins, military adoption, mechanical evolution
+  cryptanalysis_math.md # IoC, bigrams, Banburismus, the Bombe, hill climbing, keyspace
+  bletchley_park.md   # the place, the Poles, Turing, Welchman, Knox, the women, Colossus
+```
+
+## Background Reading
+
+- [The Enigma Machine](docs/enigma_history.md) — Scherbius's 1918 patent through the M4 four-rotor variant. The mechanical evolution, the operational procedures that created vulnerabilities, and the key dates in cryptanalysis from Rejewski's 1932 breakthrough to the M4 blackout and recovery.
+- [The Mathematics of Breaking Enigma](docs/cryptanalysis_math.md) — Friedman's Index of Coincidence, bigram frequency analysis, Turing's Banburismus and the Bombe, hill climbing for plugboard recovery, and the combinatorics of the 159-quintillion-configuration keyspace.
+- [Bletchley Park: The Place and Its People](docs/bletchley_park.md) — Station X, the Polish mathematicians who broke Enigma five years before the British, Turing, Welchman, Knox, the 7,500 women who made up 75% of the workforce, Tommy Flowers and Colossus, and the three decades of silence that followed.

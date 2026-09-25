@@ -1,0 +1,6 @@
+solver
+solver_gpu
+*.o
+*.air
+*.metallib
+*.dSYM/
