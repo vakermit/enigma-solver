@@ -20,7 +20,10 @@ from dataclasses import dataclass, asdict
 from enigma.machine import EnigmaMachine
 
 ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-ROTORS = ['I', 'II', 'III', 'IV', 'V']
+ROTORS_ARMY = ['I', 'II', 'III', 'IV', 'V']
+ROTORS_NAVY = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
+M4_FOURTH = ['Beta', 'Gamma']
+THIN_REFLECTORS = ['B-Thin', 'C-Thin']
 
 IOC_TARGET = {'english': 0.0667, 'german': 0.0762, 'random': 0.0385}
 
@@ -136,9 +139,9 @@ def ring_phase(ct, candidates, ring_idx, label, beam_width, reflector):
     return top
 
 
-def solve(ct, beam_width, reflector, lang):
+def solve(ct, beam_width, reflector, lang, rotors):
     bigrams = GERMAN_BIGRAMS if lang == 'german' else ENGLISH_BIGRAMS
-    rotor_combos = list(itertools.permutations(ROTORS, 3))
+    rotor_combos = list(itertools.permutations(rotors, 3))
     total_trials = 0
 
     # Phase 1: brute-force all rotor combos × all 26³ start positions
@@ -188,6 +191,113 @@ def solve(ct, beam_width, reflector, lang):
         bg = calc_bigram_score(pt, bigrams)
         results.append(Candidate(
             rotors=rs, reflector=reflector, rings=rings,
+            start=start, plugboard='', ioc=ioc,
+            bigram_score=bg, plaintext=pt,
+        ))
+    results.sort(key=lambda c: c.bigram_score, reverse=True)
+    return results, total_trials
+
+
+def solve_m4(ct, beam_width, lang, rotors):
+    """M4 four-rotor solver. Tests Beta/Gamma × thin reflectors, then 3-rotor combos."""
+    bigrams = GERMAN_BIGRAMS if lang == 'german' else ENGLISH_BIGRAMS
+    rotor_combos = list(itertools.permutations(rotors, 3))
+    total_trials = 0
+
+    all_candidates = []
+    for fourth in M4_FOURTH:
+        for thin_ref in THIN_REFLECTORS:
+            n_trials = len(rotor_combos) * 26 * 26 * 26
+            print(f'\n--- M4: {fourth} + {thin_ref} — {len(rotor_combos)} combos × 17,576 positions = {n_trials:,} ---')
+            candidates = []
+            for ci, combo in enumerate(rotor_combos):
+                rs = f'{fourth} {" ".join(combo)}'
+                for l_pos in ALPHABET:
+                    for m_pos in ALPHABET:
+                        for r_pos in ALPHABET:
+                            start = 'A' + l_pos + m_pos + r_pos
+                            machine = EnigmaMachine.from_key_sheet(
+                                rotors=rs,
+                                reflector=thin_ref,
+                                ring_settings=[0, 0, 0, 0],
+                                plugboard_settings='',
+                            )
+                            machine.set_display(start)
+                            pt = machine.process_text(ct)
+                            ioc = calc_ioc(pt)
+                            candidates.append((ioc, rs, start, [0, 0, 0, 0], thin_ref))
+                if (ci + 1) % 20 == 0:
+                    print(f'  ... {ci + 1}/{len(rotor_combos)} combos done')
+            total_trials += len(candidates)
+            candidates.sort(reverse=True)
+            best = candidates[:beam_width]
+            print(f'  Best IoC: {best[0][0]:.6f}  ({best[0][1]} @ {best[0][2]})')
+            all_candidates.extend(best)
+
+    # Also try all 26 positions for the 4th rotor on top candidates
+    print(f'\n--- M4 Phase 2: top {beam_width} × 26 fourth-rotor positions ---')
+    all_candidates.sort(reverse=True)
+    top = all_candidates[:beam_width]
+    expanded = []
+    seen = set()
+    for (_, rs, start, rings, ref) in top:
+        for fourth_pos in ALPHABET:
+            s = fourth_pos + start[1:]
+            key = (rs, s, tuple(rings), ref)
+            if key in seen:
+                continue
+            seen.add(key)
+            machine = EnigmaMachine.from_key_sheet(
+                rotors=rs, reflector=ref,
+                ring_settings=rings, plugboard_settings='',
+            )
+            machine.set_display(s)
+            pt = machine.process_text(ct)
+            ioc = calc_ioc(pt)
+            expanded.append((ioc, rs, s, rings, ref))
+    total_trials += len(expanded)
+    expanded.sort(reverse=True)
+    refined = expanded[:beam_width]
+    print(f'  Best IoC: {refined[0][0]:.6f}  ({refined[0][1]} @ {refined[0][2]})')
+
+    # Ring refinement for positions 1-3 (skip 4th rotor ring, it doesn't step)
+    for idx, name in enumerate(['left', 'middle', 'right']):
+        ring_idx = idx + 1
+        print(f'\n--- M4 Ring: top {beam_width} × 26 {name} ring settings ---')
+        new_candidates = []
+        seen = set()
+        for (_, rs, start, rings, ref) in refined:
+            for r in range(0, 26):
+                new_rings = list(rings)
+                new_rings[ring_idx] = r
+                key = (rs, start, tuple(new_rings), ref)
+                if key in seen:
+                    continue
+                seen.add(key)
+                machine = EnigmaMachine.from_key_sheet(
+                    rotors=rs, reflector=ref,
+                    ring_settings=new_rings, plugboard_settings='',
+                )
+                machine.set_display(start)
+                pt = machine.process_text(ct)
+                ioc = calc_ioc(pt)
+                new_candidates.append((ioc, rs, start, new_rings, ref))
+        total_trials += len(new_candidates)
+        new_candidates.sort(reverse=True)
+        refined = new_candidates[:beam_width]
+        print(f'  Best IoC: {refined[0][0]:.6f}  (rings={refined[0][3]})')
+
+    results = []
+    for (ioc, rs, start, rings, ref) in refined:
+        machine = EnigmaMachine.from_key_sheet(
+            rotors=rs, reflector=ref,
+            ring_settings=rings, plugboard_settings='',
+        )
+        machine.set_display(start)
+        pt = machine.process_text(ct)
+        bg = calc_bigram_score(pt, bigrams)
+        results.append(Candidate(
+            rotors=rs, reflector=ref, rings=rings,
             start=start, plugboard='', ioc=ioc,
             bigram_score=bg, plaintext=pt,
         ))
@@ -270,6 +380,10 @@ def main():
                         help='Save best settings to JSON file')
     parser.add_argument('-n', '--show', type=int, default=10,
                         help='Number of results to display (default: 10)')
+    parser.add_argument('--navy', action='store_true',
+                        help='Navy M3 mode: rotors I-VIII (336 combos instead of 60)')
+    parser.add_argument('--m4', action='store_true',
+                        help='Navy M4 mode: 4 rotors (Beta/Gamma + I-VIII + thin reflectors)')
     args = parser.parse_args()
 
     if args.file:
@@ -285,9 +399,14 @@ def main():
     if len(ct) < 20:
         print(f'WARNING: ciphertext is only {len(ct)} chars — IoC will be unreliable', file=sys.stderr)
 
+    rotors = ROTORS_NAVY if (args.navy or args.m4) else ROTORS_ARMY
+    mode = 'M4' if args.m4 else ('Navy M3' if args.navy else 'Army/Luftwaffe')
+
     print(f'Ciphertext ({len(ct)} chars): {ct[:60]}{"..." if len(ct) > 60 else ""}')
-    print(f'Language: {args.lang} | Beam: {args.beam} | Reflector: {args.reflector}')
+    print(f'Language: {args.lang} | Beam: {args.beam} | Reflector: {args.reflector} | Mode: {mode}')
     print(f'Target IoC: {IOC_TARGET[args.lang]:.4f} (random: {IOC_TARGET["random"]:.4f})')
+    n_combos = len(list(itertools.permutations(rotors, 3)))
+    print(f'Rotors: {" ".join(rotors)} ({n_combos} permutations)')
 
     reflectors = ['B', 'C'] if args.reflector == 'both' else [args.reflector]
     bigrams = GERMAN_BIGRAMS if args.lang == 'german' else ENGLISH_BIGRAMS
@@ -296,12 +415,17 @@ def main():
     total_trials = 0
     t0 = time.time()
 
-    for ref in reflectors:
-        if len(reflectors) > 1:
-            print(f'\n{"=" * 50}\n  Reflector {ref}\n{"=" * 50}')
-        results, trials = solve(ct, args.beam, ref, args.lang)
+    if args.m4:
+        results, trials = solve_m4(ct, args.beam, args.lang, rotors)
         all_results.extend(results)
         total_trials += trials
+    else:
+        for ref in reflectors:
+            if len(reflectors) > 1:
+                print(f'\n{"=" * 50}\n  Reflector {ref}\n{"=" * 50}')
+            results, trials = solve(ct, args.beam, ref, args.lang, rotors)
+            all_results.extend(results)
+            total_trials += trials
 
     all_results.sort(key=lambda c: c.bigram_score, reverse=True)
     elapsed = time.time() - t0
