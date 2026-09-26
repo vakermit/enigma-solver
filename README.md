@@ -43,6 +43,31 @@ make gpu                # Metal GPU solver (macOS only)
 
 The GPU solver requires macOS with Metal support. It compiles the compute shader at runtime — no Xcode installation needed, just the Command Line Tools.
 
+### Rust (`rust/`)
+
+Zero-dependency implementation using `std::thread` for parallelism.
+
+```bash
+cd rust
+cargo build --release
+./target/release/enigma-solver --help
+./target/release/enigma-solver -l english "CIPHERTEXT"
+./target/release/enigma-solver -l english -q "CIPHERTEXT"    # quick-pass
+./target/release/enigma-solver -l english -s "CIPHERTEXT"    # separate-rings
+```
+
+### Go (`go/`)
+
+Standard library only, goroutines for parallelism.
+
+```bash
+cd go
+go build -o solver .
+./solver -l english "CIPHERTEXT"
+./solver -l english -q "CIPHERTEXT"    # quick-pass
+./solver -l english -s "CIPHERTEXT"    # separate-rings
+```
+
 ## How It Works
 
 1. **Brute force** all 60 rotor permutations x 17,576 start positions (1,054,560 configurations), scoring each decryption by IoC
@@ -68,6 +93,8 @@ Tested on Apple M1 Max, 88-character ciphertext:
 | Implementation | Phase 1 Time | Speedup |
 |----------------|-------------|---------|
 | Python | 153 s | 1x |
+| Go (goroutines) | 545 ms | 280x |
+| Rust (std::thread) | 324 ms | 472x |
 | C++ CPU (10 threads) | 218 ms | 700x |
 | C++ Metal GPU (32 cores) | 87 ms | 1,760x |
 
@@ -87,6 +114,14 @@ cpp/
   solver.cpp         # multi-threaded CPU solver
   metal_solver.mm    # Metal GPU solver (macOS)
   Makefile
+
+rust/
+  src/main.rs        # multi-threaded solver (std::thread, zero deps)
+  Cargo.toml
+
+go/
+  main.go            # goroutine-parallel solver (stdlib only)
+  go.mod
 
 docs/
   enigma_history.md     # the machine: origins, military adoption, mechanical evolution
