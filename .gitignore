@@ -8,3 +8,16 @@ Thumbs.db
 *~
 .vscode/
 .idea/
+
+# Build artifacts
+cpp/solver
+cpp/solver_gpu
+cpp/crib_solver
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Project manager
+.projmgr.toml

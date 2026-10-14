@@ -1,0 +1,76 @@
+# German Naval Enigma Cribs
+# Navy encoding: X=space/period, Y=comma, UD=?, numbers spelled out
+# CH is NOT converted to Q (that's army/luftwaffe only)
+# One word/phrase per line, uppercase alpha only
+
+# Message structure (very common headers/footers)
+VONX
+ANX
+ANXX
+FUNKSPRUCH
+EINS
+ZWO
+DREI
+VIER
+FUENF
+SECHS
+SIEBEN
+ACHT
+NEUN
+NULL
+
+# Weather (routine reports, extremely common)
+WETTER
+WETTERX
+WETTERBERICHT
+WIND
+WINDSTAERKE
+NORDX
+SUEDX
+WESTX
+OSTX
+NORDWEST
+NORDOST
+SUEDWEST
+SUEDOST
+NEBEL
+REGEN
+WOLKEN
+SICHT
+SEEGANG
+
+# Status reports
+NICHTS
+NICHTSXZUXMELDEN
+KEINEX
+KEINEBESONDEREN
+MELDUNG
+FORTX
+
+# Naval operations
+BOOT
+UBOOT
+KONVOI
+GELEITZUG
+KURS
+FEIND
+FEINDX
+ANGRIFF
+TORPEDO
+MINEN
+VERSENKUNG
+POSITION
+HAFEN
+MARSCH
+
+# Common words in messages
+BEFEHL
+SOFORT
+ZURUECK
+AUSLAUFEN
+EINLAUFEN
+GELEIT
+
+# Short high-value cribs (4 chars)
+HEIL
+ENDE
