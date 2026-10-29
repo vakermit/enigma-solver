@@ -16,6 +16,8 @@ python esolve.py --help
 python esolve.py "CIPHERTEXT" --lang english --beam 50
 python esolve.py "CIPHERTEXT" --navy --lang german    # M3 Navy (rotors I-VIII)
 python esolve.py "CIPHERTEXT" --m4 --lang german      # M4 four-rotor Navy
+python esolve.py "CIPHERTEXT" --lang spanish           # Spanish-language messages
+python esolve.py "CIPHERTEXT" --lang french             # French-language messages
 ```
 
 **Z3 SAT Solver** — constraint-based crib attack using Z3's SMT solver:
@@ -124,8 +126,24 @@ For each rotor combination, builds a Z3 formula encoding the full Enigma encrypt
 
 ### Fitness Metrics
 
-- **Index of Coincidence (IoC)**: measures letter distribution deviation from random. English ~0.067, German ~0.076, random ~0.038. Plugboard-invariant — works without knowing the plugboard. Unreliable below ~100 characters.
+- **Index of Coincidence (IoC)**: measures letter distribution deviation from random. Plugboard-invariant — works without knowing the plugboard. Unreliable below ~100 characters.
 - **Bigram frequency**: scores consecutive letter pairs against language tables. More discriminating than IoC for final ranking and plugboard recovery.
+
+#### IoC Reference Values by Language
+
+| Language | IoC | Notes |
+|----------|-----|-------|
+| English | 0.0667 | |
+| German | 0.0762 | Standard for Wehrmacht/Kriegsmarine traffic |
+| Spanish | 0.0766 | For post-Civil War Spanish Enigma traffic |
+| French | 0.0746 | |
+| Dutch | 0.0798 | Highest IoC among supported languages |
+| Portuguese | 0.0745 | |
+| Polish | 0.0651 | Diacritics folded to 26-letter Latin |
+| Russian | 0.0670 | Cyrillic transliterated to 26-letter Latin; approximate |
+| Random | 0.0385 | Baseline for encrypted/random text |
+
+All solvers (`--lang`) support these eight languages for both IoC targeting and bigram ranking. Polish and Russian values assume transliteration to the 26-letter Latin alphabet used by Enigma machines.
 
 ## Limitations
 
@@ -133,6 +151,8 @@ For each rotor combination, builds a Z3 formula encoding the full Enigma encrypt
 - Crib attacks require guessing the plaintext content; short cribs (<6 chars) produce excessive false positives
 - The M4 four-rotor naval Enigma has a much larger key space (×26 for the Greek rotor position, ×2 for thin reflectors) — full M4 search is ~26× slower than 3-rotor
 - Messages that were historically "never deciphered" typically had no available cribs and were too short for statistical attacks
+- **Commercial Enigma K** (used by Spain) had different rotor wiring from military variants — the solvers currently implement military rotor wirings only. See [Spanish Enigma](docs/spanish_enigma.md) for details
+- **Polish and Russian** bigram tables assume transliteration to 26-letter Latin; accuracy depends on the transliteration scheme used
 
 ## Performance
 
@@ -201,4 +221,5 @@ docs/
 - [Bletchley Park: The Place and Its People](docs/bletchley_park.md)
 - [German Enigma Procedures and Variations](docs/german_procedures.md)
 - [Message Length and Formatting](docs/message_formatting.md)
+- [The Spanish Enigma — Post-WWII Use](docs/spanish_enigma.md)
 - [P1030680 — The Last Unbroken Enigma Message](docs/p1030680_research.md)

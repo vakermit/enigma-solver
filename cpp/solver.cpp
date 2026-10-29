@@ -19,7 +19,7 @@ struct Config {
     int beam;
     int show;
     int num_threads;
-    bool use_german;
+    int lang_idx; // 0=en 1=de 2=es 3=fr 4=nl 5=pt 6=pl 7=ru
     bool do_plugboard;
     bool try_both_reflectors;
     bool quick_pass;
@@ -108,6 +108,31 @@ void get_reflector_for_candidate(const Candidate& c, int* out) {
                                               : enigma::REFLECTOR_B;
         memcpy(out, src, 26 * sizeof(int));
     }
+}
+
+static const char* LANG_NAMES[] = {
+    "english", "german", "spanish", "french",
+    "dutch", "portuguese", "polish", "russian"
+};
+
+const float (*get_bigrams(int lang_idx))[26] {
+    switch (lang_idx) {
+        case 0: return enigma::EN_BIGRAMS;
+        case 1: return enigma::DE_BIGRAMS;
+        case 2: return enigma::ES_BIGRAMS;
+        case 3: return enigma::FR_BIGRAMS;
+        case 4: return enigma::NL_BIGRAMS;
+        case 5: return enigma::PT_BIGRAMS;
+        case 6: return enigma::PL_BIGRAMS;
+        case 7: return enigma::RU_BIGRAMS;
+        default: return enigma::EN_BIGRAMS;
+    }
+}
+
+int parse_lang(const char* s) {
+    for (int i = 0; i < 8; i++)
+        if (strcmp(s, LANG_NAMES[i]) == 0) return i;
+    return 0;
 }
 
 void display_results(const std::vector<Candidate>& results, int show_n, bool m4_mode) {
@@ -551,7 +576,7 @@ int main(int argc, char** argv) {
     cfg.beam = 50;
     cfg.show = 10;
     cfg.num_threads = (int)std::thread::hardware_concurrency();
-    cfg.use_german = true;
+    cfg.lang_idx = 1;
     cfg.reflector = 0;
     cfg.quick_pass_pct = 25;
 
@@ -565,7 +590,7 @@ int main(int argc, char** argv) {
             fclose(fp);
             break;
         }
-        case 'l': cfg.use_german = (strcmp(optarg, "german") == 0); break;
+        case 'l': cfg.lang_idx = parse_lang(optarg); break;
         case 'b': cfg.beam = atoi(optarg); break;
         case 'r':
             if (strcmp(optarg, "C") == 0) cfg.reflector = 1;
@@ -583,7 +608,8 @@ int main(int argc, char** argv) {
         case 'h':
             printf("Usage: solver [options] <ciphertext>\n"
                    "  -f, --file FILE         Read ciphertext from file\n"
-                   "  -l, --lang LANG         english|german (default: german)\n"
+                   "  -l, --lang LANG         english|german|spanish|french|dutch|\n"
+                   "                          portuguese|polish|russian (default: german)\n"
                    "  -b, --beam N            Beam width (default: 50)\n"
                    "  -r, --reflector REF     B|C|both (default: B)\n"
                    "  -p, --plugboard         Run plugboard hill climbing\n"
@@ -622,7 +648,7 @@ int main(int argc, char** argv) {
     enigma::init(num_rotors);
     enigma::init_bigrams();
 
-    const float (*bigrams)[26] = cfg.use_german ? enigma::DE_BIGRAMS : enigma::EN_BIGRAMS;
+    const float (*bigrams)[26] = get_bigrams(cfg.lang_idx);
 
     const char* mode_str = cfg.m4 ? "M4" :
                            cfg.separate_rings ? "separate-rings" :
@@ -630,7 +656,7 @@ int main(int argc, char** argv) {
     printf("Ciphertext (%d chars): %.60s%s\n", cfg.ct_len, cfg.ciphertext,
            cfg.ct_len > 60 ? "..." : "");
     printf("Language: %s | Beam: %d | Reflector: %c | Threads: %d | Mode: %s\n",
-           cfg.use_german ? "german" : "english", cfg.beam,
+           LANG_NAMES[cfg.lang_idx], cfg.beam,
            cfg.reflector == 0 ? 'B' : 'C', cfg.num_threads, mode_str);
     printf("Rotors: %s (%d permutations)\n",
            cfg.navy ? "I-VIII" : "I-V", enigma::NUM_COMBOS);

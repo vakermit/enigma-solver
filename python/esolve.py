@@ -25,7 +25,11 @@ ROTORS_NAVY = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
 M4_FOURTH = ['Beta', 'Gamma']
 THIN_REFLECTORS = ['B-Thin', 'C-Thin']
 
-IOC_TARGET = {'english': 0.0667, 'german': 0.0762, 'random': 0.0385}
+IOC_TARGET = {
+    'english': 0.0667, 'german': 0.0762, 'spanish': 0.0766,
+    'french': 0.0746, 'dutch': 0.0798, 'portuguese': 0.0745,
+    'polish': 0.0651, 'russian': 0.0670, 'random': 0.0385,
+}
 
 ENGLISH_BIGRAMS = {
     'TH': 35.6, 'HE': 30.7, 'IN': 24.3, 'ER': 20.5, 'AN': 19.9,
@@ -49,6 +53,72 @@ GERMAN_BIGRAMS = {
     'EM': 8.2, 'EL': 8.0, 'VE': 7.8, 'HA': 7.5, 'AL': 7.2,
     'IT': 7.0, 'IS': 6.8, 'SI': 6.5, 'SO': 6.2, 'RA': 6.0,
     'SS': 5.8, 'AB': 5.5, 'RI': 5.3, 'FE': 5.0, 'MI': 4.8,
+}
+
+SPANISH_BIGRAMS = {
+    'DE': 25.5, 'EN': 23.8, 'ES': 21.5, 'EL': 16.2, 'LA': 15.0,
+    'OS': 14.5, 'AR': 14.0, 'ON': 13.5, 'ER': 13.0, 'AN': 12.8,
+    'AS': 12.5, 'AL': 12.0, 'RE': 11.8, 'SE': 11.5, 'CI': 11.0,
+    'RA': 10.8, 'CO': 10.5, 'TE': 10.2, 'ST': 9.8, 'OR': 9.5,
+    'AD': 9.2, 'IO': 9.0, 'TA': 8.8, 'NE': 8.5, 'NT': 8.2,
+    'IE': 8.0, 'DO': 7.8, 'UE': 7.5, 'NO': 7.2, 'AC': 7.0,
+    'MA': 6.8, 'EC': 6.5, 'TO': 6.2, 'LE': 6.0, 'PA': 5.8,
+    'IN': 5.5, 'LO': 5.2, 'PO': 5.0, 'DA': 4.8, 'ME': 4.5,
+}
+
+FRENCH_BIGRAMS = {
+    'ES': 27.5, 'EN': 25.0, 'DE': 24.0, 'LE': 20.5, 'RE': 19.0,
+    'NT': 17.5, 'ON': 16.8, 'ER': 16.0, 'AN': 15.5, 'TE': 15.0,
+    'ET': 14.5, 'EL': 13.8, 'SE': 13.2, 'AI': 12.8, 'OU': 12.5,
+    'LA': 12.0, 'IT': 11.5, 'NS': 11.0, 'ED': 10.8, 'NE': 10.5,
+    'ME': 10.2, 'CE': 9.8, 'QU': 9.5, 'IO': 9.2, 'IE': 9.0,
+    'AT': 8.8, 'EM': 8.5, 'CO': 8.2, 'OR': 8.0, 'IS': 7.8,
+    'AR': 7.5, 'LI': 7.2, 'RI': 7.0, 'PA': 6.8, 'TI': 6.5,
+    'UR': 6.2, 'AL': 6.0, 'IL': 5.8, 'UN': 5.5, 'ST': 5.2,
+}
+
+DUTCH_BIGRAMS = {
+    'EN': 38.0, 'DE': 27.5, 'ER': 24.0, 'AN': 18.5, 'ET': 17.0,
+    'IN': 16.5, 'HE': 16.0, 'TE': 15.5, 'EE': 14.5, 'GE': 14.0,
+    'ND': 13.5, 'VE': 13.0, 'IJ': 12.5, 'AA': 12.0, 'ST': 11.5,
+    'OO': 11.0, 'OR': 10.5, 'EL': 10.0, 'RE': 9.5, 'AR': 9.0,
+    'IE': 8.5, 'AL': 8.0, 'DA': 7.8, 'ON': 7.5, 'NG': 7.2,
+    'CH': 7.0, 'VA': 6.8, 'IS': 6.5, 'IT': 6.2, 'ES': 6.0,
+    'BE': 5.8, 'ME': 5.5, 'DI': 5.2, 'SE': 5.0, 'AT': 4.8,
+    'TO': 4.5, 'WA': 4.2, 'LE': 4.0, 'OE': 3.8, 'NI': 3.5,
+}
+
+PORTUGUESE_BIGRAMS = {
+    'DE': 25.0, 'OS': 19.0, 'AS': 18.5, 'RA': 16.0, 'DO': 15.5,
+    'ES': 15.0, 'AR': 14.5, 'EN': 14.0, 'DA': 13.5, 'ER': 13.0,
+    'CO': 12.5, 'AD': 12.0, 'RE': 11.5, 'AN': 11.0, 'NT': 10.5,
+    'EM': 10.0, 'OR': 9.5, 'TE': 9.0, 'AL': 8.5, 'SE': 8.2,
+    'ON': 8.0, 'MA': 7.8, 'TO': 7.5, 'AC': 7.2, 'IO': 7.0,
+    'TA': 6.8, 'NO': 6.5, 'ST': 6.2, 'EI': 6.0, 'ME': 5.8,
+    'PA': 5.5, 'CA': 5.2, 'PO': 5.0, 'RI': 4.8, 'OU': 4.5,
+    'IN': 4.2, 'EL': 4.0, 'IA': 3.8, 'IS': 3.5, 'SI': 3.2,
+}
+
+POLISH_BIGRAMS = {
+    'IE': 25.0, 'NI': 20.5, 'CZ': 18.5, 'RZ': 17.0, 'PO': 16.5,
+    'NA': 16.0, 'ST': 15.5, 'OW': 14.5, 'AN': 14.0, 'PR': 13.5,
+    'ZE': 13.0, 'WI': 12.5, 'RA': 12.0, 'KO': 11.5, 'DO': 11.0,
+    'MI': 10.5, 'SI': 10.0, 'NE': 9.5, 'GO': 9.0, 'OD': 8.5,
+    'RO': 8.0, 'TO': 7.8, 'JE': 7.5, 'IA': 7.2, 'NO': 7.0,
+    'WA': 6.8, 'SZ': 6.5, 'IC': 6.2, 'AL': 6.0, 'TA': 5.8,
+    'EN': 5.5, 'OS': 5.2, 'KA': 5.0, 'IN': 4.8, 'EG': 4.5,
+    'LI': 4.2, 'IS': 4.0, 'SK': 3.8, 'OR': 3.5, 'PI': 3.2,
+}
+
+RUSSIAN_BIGRAMS = {
+    'ST': 25.0, 'NA': 22.5, 'EN': 20.0, 'NO': 18.5, 'TO': 17.5,
+    'OV': 16.5, 'NI': 15.5, 'RA': 15.0, 'KO': 14.5, 'PO': 14.0,
+    'OR': 13.5, 'GO': 13.0, 'OB': 12.5, 'ER': 12.0, 'NE': 11.5,
+    'PR': 11.0, 'RE': 10.5, 'TA': 10.0, 'RO': 9.5, 'ET': 9.0,
+    'AN': 8.5, 'LI': 8.0, 'OS': 7.5, 'OT': 7.0, 'LE': 6.8,
+    'DA': 6.5, 'OL': 6.2, 'SK': 6.0, 'DE': 5.8, 'VE': 5.5,
+    'MI': 5.2, 'TI': 5.0, 'SE': 4.8, 'IS': 4.5, 'AL': 4.2,
+    'IN': 4.0, 'EL': 3.8, 'ON': 3.5, 'RI': 3.2, 'ES': 3.0,
 }
 
 
@@ -205,9 +275,17 @@ def ring_phase(ct, candidates, ring_idx, label, beam_width, reflector):
     return top
 
 
+BIGRAM_TABLES = {
+    'english': ENGLISH_BIGRAMS, 'german': GERMAN_BIGRAMS,
+    'spanish': SPANISH_BIGRAMS, 'french': FRENCH_BIGRAMS,
+    'dutch': DUTCH_BIGRAMS, 'portuguese': PORTUGUESE_BIGRAMS,
+    'polish': POLISH_BIGRAMS, 'russian': RUSSIAN_BIGRAMS,
+}
+
+
 def solve(ct, beam_width, reflector, lang, rotors,
           quick_pass=False, quick_pass_pct=25, separate_rings=False):
-    bigrams = GERMAN_BIGRAMS if lang == 'german' else ENGLISH_BIGRAMS
+    bigrams = BIGRAM_TABLES.get(lang, ENGLISH_BIGRAMS)
     rotor_combos = list(itertools.permutations(rotors, 3))
     total_trials = 0
 
@@ -346,7 +424,7 @@ def solve(ct, beam_width, reflector, lang, rotors,
 
 def solve_m4(ct, beam_width, lang, rotors):
     """M4 four-rotor solver. Tests Beta/Gamma × thin reflectors, then 3-rotor combos."""
-    bigrams = GERMAN_BIGRAMS if lang == 'german' else ENGLISH_BIGRAMS
+    bigrams = BIGRAM_TABLES.get(lang, ENGLISH_BIGRAMS)
     rotor_combos = list(itertools.permutations(rotors, 3))
     total_trials = 0
 
@@ -514,7 +592,9 @@ def main():
     )
     parser.add_argument('ciphertext', nargs='?', help='Ciphertext to solve')
     parser.add_argument('-f', '--file', help='Read ciphertext from file')
-    parser.add_argument('-l', '--lang', choices=['english', 'german'], default='german',
+    parser.add_argument('-l', '--lang', default='german',
+                        choices=['english', 'german', 'spanish', 'french',
+                                 'dutch', 'portuguese', 'polish', 'russian'],
                         help='Target language (default: german)')
     parser.add_argument('-b', '--beam', type=int, default=50,
                         help='Beam width / top-N kept per phase (default: 50)')
@@ -599,7 +679,7 @@ def main():
     print(f'Rotors: {" ".join(rotors)} ({n_combos} permutations)')
 
     reflectors = ['B', 'C'] if args.reflector == 'both' else [args.reflector]
-    bigrams = GERMAN_BIGRAMS if args.lang == 'german' else ENGLISH_BIGRAMS
+    bigrams = BIGRAM_TABLES.get(args.lang, ENGLISH_BIGRAMS)
 
     all_results = []
     total_trials = 0
