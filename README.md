@@ -201,3 +201,4 @@ docs/
 - [Bletchley Park: The Place and Its People](docs/bletchley_park.md)
 - [German Enigma Procedures and Variations](docs/german_procedures.md)
 - [Message Length and Formatting](docs/message_formatting.md)
+- [P1030680 — The Last Unbroken Enigma Message](docs/p1030680_research.md)
